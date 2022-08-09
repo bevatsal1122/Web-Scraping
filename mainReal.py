@@ -1,49 +1,58 @@
-from ast import keyword
 from bs4 import BeautifulSoup
 import requests
 
-keywords = input("Enter Keywords: ")
-keywords = keywords.replace(' ', '+');
+keywords = ''
+while keywords == '': 
+   keywords = input("Enter Keywords: ")
+   keywords = keywords.replace(' ', '+')
+
+blacklist = input("Enter Skills to blacklist: ")
+blacklist = blacklist.split(' ')
 
 requestPage = 'https://www.timesjobs.com/candidate/job-search.html?searchType=personalizedSearch&from=submit&txtKeywords=' + keywords + '&txtLocation='
-def ignoreSpaces(text):
-   word = ''
-   i = False
-   for letter in text:
-      if (letter.isalpha() or (i and letter != '\n')):
-         word += letter
-         i = True
-      else:
-         i = False
-   return word; 
 
 htmlText = requests.get(requestPage).text
 soup = BeautifulSoup(htmlText, 'lxml')
 ulTag = soup.find('ul', class_="new-joblist")
 liTags = ulTag.find_all('li', class_="clearfix job-bx wht-shd-bx")
 
-for liTag in liTags:
+for index, liTag in enumerate(liTags):
    title = liTag.find('h2')
+   detailsLink = liTag.header.h2.a['href']
    companyName = liTag.find('h3')
    skills = liTag.find('span', class_="srp-skills")
 
    ulInner = liTag.find('ul', class_="top-jd-dtl clearfix")
    liInner = ulInner.find_all('li')
+
    # print(title.text)
-   propName = ignoreSpaces(companyName.text)
-   propTitle = ignoreSpaces(title.text)
-   propSkills = ignoreSpaces(skills.text)
 
-   print('\n')
-   print(f"Company Name: {propName}\nJob Title: {propTitle}\nSkills Requirement: {propSkills}")
+   dontshow = True
+   propName = companyName.text.strip()
+   propTitle = title.text.strip()
+   propSkills = skills.text.strip()
+   propDetailsLink = detailsLink.strip()
 
-   location=""
-   if (len(liInner) >= 3):
-      propCTC = ignoreSpaces(liInner[1].text)
-      location = liInner[2].find('span')
-      print(f"Job CTC Range: {propCTC}")
-   else:
-      location = liInner[1].find('span')
+   for blackSKill in blacklist:
+      if blackSKill == '' or blackSKill == ' ':
+         break
+      if (blackSKill in propSkills):
+         dontshow = False
+         break
 
-   propLocation = ignoreSpaces(location.text)
-   print(f"Job Location: {propLocation}")
+   if dontshow:
+      with open("posts/jobFile.txt", 'a') as file:
+         file.write(f"Company Name: {propName}\nJob Title: {propTitle}\nSkills Requirement: {propSkills}")
+
+         location=""
+         if (len(liInner) >= 3):
+            propCTC = liInner[1].text.strip().replace('₹', '')
+            location = liInner[2].find('span')
+            file.write(f"Job CTC Range: {propCTC}")
+         else:
+            location = liInner[1].find('span')
+
+         propLocation = location.text.strip()
+         file.write(f"Job Location: {propLocation}\nMore Job Details: {propDetailsLink}\n\n")
+
+print("Job Information Saved in jobFile.text")
